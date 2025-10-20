@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  # Frontend React
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: neurobridge-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:5000/api
+      - VITE_AI_API_URL=http://localhost:8000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+      - ai_services
+    networks:
+      - neurobridge-network
+
+  # Backend Node.js
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: neurobridge-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=development
+      - PORT=5000
+      - MONGODB_URI=mongodb://mongodb:27017/neurobridge-plus
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - FRONTEND_URL=http://localhost:3000
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - neurobridge-network
+
+  # AI Services Python
+  ai_services:
+    build:
+      context: ./ai_services
+      dockerfile: Dockerfile
+    container_name: neurobridge-ai
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MONGODB_URI=mongodb://mongodb:27017/neurobridge-plus
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    volumes:
+      - ./ai_services:/app
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - neurobridge-network
+
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: neurobridge-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=neurobridge-plus
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - neurobridge-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: neurobridge-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - neurobridge-network
+
+  # Mongo Express (Interface web para MongoDB)
+  mongo-express:
+    image: mongo-express:latest
+    container_name: neurobridge-mongo-express
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_URL=mongodb://mongodb:27017/
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=admin123
+    depends_on:
+      - mongodb
+    networks:
+      - neurobridge-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  neurobridge-network:
+    driver: bridge
+
